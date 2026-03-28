@@ -1,58 +1,49 @@
 import streamlit as st
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
-# --- 1. SETUP ---
+# --- 1. PAGE CONFIG ---
 st.set_page_config(page_title="Visual Explainer AI", page_icon="🖼️")
 
-# Use your secret API Key from Streamlit Secrets or Sidebar
+st.title("🖼️ Visual Concept Explainer")
+st.write("Explain any topic with real-world images and diagrams.")
+
+# --- 2. AUTHENTICATION ---
 api_key = st.sidebar.text_input("Enter Gemini API Key:", type="password")
 
 if api_key:
-    genai.configure(api_key=api_key)
+    # Initialize the new 2026 Client
+    client = genai.Client(api_key=api_key)
     
-    # We enable 'google_search' so the AI can find real image links
-    model = genai.GenerativeModel(
-        model_name="gemini-2.5-flash",
-        tools=[{"google_search": {}}] 
-    )
-
-    st.title("🖼️ Visual Concept Explainer")
-    st.write("Enter a topic, and I'll explain it with plenty of visual aids.")
-
-    # --- 2. USER INPUT ---
-    topic = st.text_input("What do you want to learn about?", placeholder="e.g., How a Jet Engine works")
-    detail_level = st.select_slider("Detail Level", options=["Simple", "Standard", "Deep Dive"])
-
+    # --- 3. USER INPUT ---
+    topic = st.text_input("What do you want to learn about?", placeholder="e.g., The Water Cycle")
+    
     if st.button("Explain with Images"):
         if not topic:
-            st.error("Please enter a topic first!")
+            st.error("Please enter a topic!")
         else:
-            with st.spinner(f"Researching and finding images for '{topic}'..."):
-                # --- 3. THE PROMPT ---
-                # We tell the AI to use Markdown image syntax: ![description](url)
+            with st.spinner(f"Researching '{topic}'..."):
+                # Use 'google_search' tool to ground the AI in real data and images
+                search_tool = types.Tool(google_search=types.GoogleSearch())
+                
                 prompt = f"""
-                Explain the topic '{topic}' in a {detail_level} way.
-                RULES:
-                1. Break the explanation into 3-5 clear sections.
-                2. IMPORTANT: For EVERY section, you MUST include a relevant image using Markdown: ![description](image_url).
-                3. Use your Google Search tool to find actual, high-quality image URLs from educational sites or Wikipedia.
-                4. Use bold headers and bullet points for readability.
+                Explain '{topic}' for a visual learner.
+                Use 3-5 sections. 
+                CRITICAL: Every section MUST include a relevant image using Markdown: ![description](url).
+                Use the Google Search tool to find real educational image URLs.
                 """
                 
                 try:
-                    response = model.generate_content(prompt)
+                    response = client.models.generate_content(
+                        model="gemini-2.0-flash", # Best for fast tool-use
+                        contents=prompt,
+                        config=types.GenerateContentConfig(tools=[search_tool])
+                    )
                     
-                    # --- 4. DISPLAY OUTPUT ---
                     st.markdown("---")
                     st.markdown(response.text)
                     
                 except Exception as e:
-                    st.error(f"An error occurred: {e}")
-
+                    st.error(f"Error: {e}")
 else:
-    st.warning("Please enter your API Key in the sidebar to start.")
-    st.info("You can get a free key at [aistudio.google.com](https://aistudio.google.com/)")
-
-# --- 5. FOOTER ---
-st.divider()
-st.caption("Built for Visual Learners | Powered by Gemini 3 Series (2026)")
+    st.info("👈 Please enter your API Key in the sidebar to begin.")
